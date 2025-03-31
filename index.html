@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image/GIF Resizer & Video to GIF Converter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+        .tool-section {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h2 {
+            margin-top: 0;
+            color: #444;
+        }
+        input[type="file"] {
+            margin-bottom: 15px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .preview {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .preview img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .download-btn {
+            display: inline-block;
+            margin-top: 10px;
+            text-decoration: none;
+            background-color: #2196F3;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+        .download-btn:hover {
+            background-color: #0b7dda;
+        }
+        .progress-container {
+            width: 100%;
+            background-color: #f1f1f1;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: none;
+        }
+        .progress-bar {
+            width: 0%;
+            height: 20px;
+            background-color: #4CAF50;
+            border-radius: 4px;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Image/GIF Resizer & Video to GIF Converter</h1>
+    
+    <div class="container">
+        <div class="tool-section">
+            <h2>Изменить размер изображения/GIF (240×135)</h2>
+            <input type="file" id="imageInput" accept="image/*,.gif">
+            <button id="resizeBtn">Изменить размер</button>
+            
+            <div class="preview" id="imagePreview">
+                <p>Здесь будет предпросмотр</p>
+            </div>
+        </div>
+        
+        <div class="tool-section">
+            <h2>Конвертировать видео в GIF</h2>
+            <input type="file" id="videoInput" accept="video/*">
+            <div>
+                <label for="gifWidth">Ширина GIF (макс. 240):</label>
+                <input type="number" id="gifWidth" value="240" min="1" max="240">
+            </div>
+            <div>
+                <label for="gifHeight">Высота GIF (макс. 135):</label>
+                <input type="number" id="gifHeight" value="135" min="1" max="135">
+            </div>
+            <div>
+                <label for="gifFps">Кадров в секунду:</label>
+                <input type="number" id="gifFps" value="10" min="1" max="30">
+            </div>
+            <button id="convertBtn">Конвертировать в GIF</button>
+            
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar" id="progressBar">0%</div>
+            </div>
+            
+            <div class="preview" id="gifPreview">
+                <p>Здесь будет предпросмотр GIF</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg.js/4.2.9003/ffmpeg.min.js"></script>
+    <script>
+        // Resize image/GIF function
+        document.getElementById('resizeBtn').addEventListener('click', function() {
+            const fileInput = document.getElementById('imageInput');
+            const preview = document.getElementById('imagePreview');
+            
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Пожалуйста, выберите файл');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    // Create canvas for resizing
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 240;
+                    canvas.height = 135;
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Draw image resized to 240x135
+                    ctx.drawImage(img, 0, 0, 240, 135);
+                    
+                    // Display preview
+                    preview.innerHTML = '';
+                    const resizedImg = document.createElement('img');
+                    resizedImg.src = canvas.toDataURL();
+                    preview.appendChild(resizedImg);
+                    
+                    // Create download link
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = canvas.toDataURL(file.type);
+                    downloadLink.download = 'resized_' + file.name;
+                    downloadLink.className = 'download-btn';
+                    downloadLink.textContent = 'Скачать измененное изображение';
+                    preview.appendChild(document.createElement('br'));
+                    preview.appendChild(downloadLink);
+                };
+                
+                img.src = e.target.result;
+            };
+            
+            reader.readAsDataURL(file);
+        });
+        
+        // Convert video to GIF function
+        document.getElementById('convertBtn').addEventListener('click', async function() {
+            const fileInput = document.getElementById('videoInput');
+            const preview = document.getElementById('gifPreview');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Пожалуйста, выберите видео файл');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            const width = Math.min(240, parseInt(document.getElementById('gifWidth').value));
+            const height = Math.min(135, parseInt(document.getElementById('gifHeight').value));
+            const fps = parseInt(document.getElementById('gifFps').value);
+            
+            // Show progress bar
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+            
+            try {
+                // Load FFmpeg
+                const { createFFmpeg, fetchFile } = FFmpeg;
+                const ffmpeg = createFFmpeg({ 
+                    log: true,
+                    progress: ({ ratio }) => {
+                        const percent = Math.round(ratio * 100);
+                        progressBar.style.width = `${percent}%`;
+                        progressBar.textContent = `${percent}%`;
+                    }
+                });
+                
+                await ffmpeg.load();
+                
+                // Write the file to FFmpeg file system
+                ffmpeg.FS('writeFile', 'input.mp4', await fetchFile(file));
+                
+                // Run the FFmpeg command to convert video to GIF
+                await ffmpeg.run(
+                    '-i', 'input.mp4',
+                    '-vf', `fps=${fps},scale=${width}:${height}:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`,
+                    '-loop', '0',
+                    'output.gif'
+                );
+                
+                // Read the result
+                const data = ffmpeg.FS('readFile', 'output.gif');
+                
+                // Display preview
+                preview.innerHTML = '';
+                const gifUrl = URL.createObjectURL(new Blob([data.buffer], { type: 'image/gif' }));
+                const gifImg = document.createElement('img');
+                gifImg.src = gifUrl;
+                preview.appendChild(gifImg);
+                
+                // Create download link
+                const downloadLink = document.createElement('a');
+                downloadLink.href = gifUrl;
+                downloadLink.download = 'converted.gif';
+                downloadLink.className = 'download-btn';
+                downloadLink.textContent = 'Скачать GIF';
+                preview.appendChild(document.createElement('br'));
+                preview.appendChild(downloadLink);
+                
+            } catch (error) {
+                console.error('Error converting video to GIF:', error);
+                alert('Произошла ошибка при конвертации: ' + error.message);
+            } finally {
+                progressContainer.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
